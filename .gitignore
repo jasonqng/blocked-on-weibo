@@ -1,5 +1,6 @@
 # User
-weibo_credentials.py
+*_credentials.py
+*_cookie.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
