@@ -24,16 +24,6 @@ import binascii
 from . import weibo_credentials
 ### SETTINGS
 
-### SETTINGS
-
-sqlite_file = 'results.sqlite' # name of sqlite file to read from/write to
-new_database = False # erases any existing sqlite file and generates an empty one to write to
-verbose = "some" # 'none',some','all'
-load_cookies = True # load cookies from disk (can load cookies without having to do fresh_log_in if cookies already exist)
-fresh_log_in = False # perform a log in
-write_cookies = False # save cookies and overwrite any existing cookies during log in
-cookie_file = weibo_credentials.Creds().username + "_cookie.txt" # name of cookie file in case you want to specify
-
 censorship_phrase_utf8 = '根据相关法律法规和政策'
 censorship_phrase_decoded = codecs.encode(censorship_phrase_utf8.decode('utf8'), 'unicode_escape')
 
@@ -124,7 +114,7 @@ def has_censorship(keyword,cookies=None):
         url = ('http://s.weibo.com/weibo/%s&Refer=index' % keyword).encode('utf-8')    
     
     try:
-        r = requests.get(url,cookies=cookie).text
+        r = requests.get(url,cookies=cookies).text
         i = 1
         while True:
             if captcha_phrase_decoded not in r:
@@ -228,11 +218,6 @@ def sqlite_to_df(sqlite_file):
     df = pd.read_sql_query("select * from results where source!='_meta_';", conn)
     return df
 
-def sqlite_to_df(sqlite_file):
-    conn = sqlite3.connect(sqlite_file)
-    df = pd.read_sql_query("select * from results;", conn)
-    return df
-
 def verify_cookies_work(cookie,return_full_response=False):
     """
     Returns True if cookies return profile indicator
@@ -247,7 +232,7 @@ def verify_cookies_work(cookie,return_full_response=False):
     else:
         return False
 
-def run(test_keywords,verbose='some',insert=True,return_df=False,sleep=True):
+def run(test_keywords,verbose='some',insert=True,sqlite_file=None,return_df=False,sleep=True,cookies=None):
     """
     Iterating through the keyword list and testing one at a time
     Handles when script or connection breaks; will pick up where it left off
@@ -261,7 +246,7 @@ def run(test_keywords,verbose='some',insert=True,return_df=False,sleep=True):
     for r in test_keywords.itertuples():
         if insert and r.Index < len(sqlite_to_df(sqlite_file)):
             continue
-        result,num_results = has_censorship(r.keyword)
+        result,num_results = has_censorship(r.keyword,cookies)
         if verbose=="all":
             print r.Index,r.keyword, result
         elif verbose=="some" and (count%10==0 or count==0):
