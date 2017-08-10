@@ -21,6 +21,7 @@ except ImportError:
 import rsa  
 import json  
 import binascii  
+from . import weibo_credentials
 ### SETTINGS
 
 ### SETTINGS
@@ -232,7 +233,7 @@ def sqlite_to_df(sqlite_file):
     df = pd.read_sql_query("select * from results;", conn)
     return df
 
-def verify_cookies_work(cookie=cookie,return_full_response=False):
+def verify_cookies_work(cookie,return_full_response=False):
     """
     Returns True if cookies return profile indicator
     If no cookie or bad cookie is passed, you get a generic login page which doesn't have the indicator
