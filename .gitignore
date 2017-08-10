@@ -1,5 +1,5 @@
 # User
-*_credentials.py
+weibo_credentials.py
 *_cookie.txt
 .DS_Store
 
