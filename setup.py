@@ -6,6 +6,6 @@ setup(name='blockedonweibo',
       url='http://github.com/jasonqng/blocked-on-weibo',
       author='Jason Q. Ng',
       author_email='jason.q.ng@gmail.com',
-      license='MIT',
+      license='BSD License',
       packages=find_packages(exclude=['docs']),
       zip_safe=False)
