@@ -157,7 +157,7 @@ def create_table(sqlite_file):
 
     
 
-def insert_into_table(record_id,keyword,result,source,notes=None,num_results=None):
+def insert_into_table(record_id,keyword,result,source,notes=None,num_results=None,sqlite_file=None):
     """
     Writing the results to the sqlite database file
     """
@@ -252,7 +252,7 @@ def run(test_keywords,verbose='some',insert=True,sqlite_file=None,return_df=Fals
         elif verbose=="some" and (count%10==0 or count==0):
             print r.Index,r.keyword, result
         if insert:
-            insert_into_table(len(sqlite_to_df(sqlite_file)),r.keyword,result,r.source,num_results,r.notes)
+            insert_into_table(len(sqlite_to_df(sqlite_file)),r.keyword,result,r.source,num_results,r.notes,sqlite_file=sqlite_file)
         if return_df:
             results_df = pd.concat([results_df,
                                     pd.DataFrame([{"date":datetime.now().date(),
@@ -267,7 +267,7 @@ def run(test_keywords,verbose='some',insert=True,sqlite_file=None,return_df=Fals
         if sleep:
             time.sleep(random.randint(13, 16))
     if insert:
-        insert_into_table(int(test_keywords.index.max())+1,None,"finished","_meta_")
+        insert_into_table(int(test_keywords.index.max())+1,None,"finished","_meta_",sqlite_file=sqlite_file)
     if return_df:
         return results_df
 
