@@ -2,6 +2,7 @@
 weibo_credentials.py
 *_cookie.txt
 .DS_Store
+temporary_files/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

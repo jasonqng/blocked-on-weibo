@@ -2,5 +2,4 @@ beautifulsoup4
 pandas
 requests
 rsa
-sqlite3
 df2gspread
