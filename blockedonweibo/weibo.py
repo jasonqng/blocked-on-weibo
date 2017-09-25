@@ -103,7 +103,7 @@ def user_login(username=weibo_credentials.Creds().username,
         json.dump(cookie_dict, open(username + "_cookie.txt",'w'))
     return session
 
-def has_censorship(keyword,
+def has_censorship(keyword_encoded,
                 cookies=None):
     """
     Function which actually looks up whether a search for the given keyword returns text
@@ -113,10 +113,7 @@ def has_censorship(keyword,
     Returns string of 'censored','no_results','reset',or 'has_results'
     ('has_results' is actually not a garuantee; it's merely a lack of other censorship indicators)
     """
-    if isinstance(keyword, str):
-        url = 'http://s.weibo.com/weibo/%s&Refer=index' % keyword
-    elif isinstance(keyword, unicode):
-        url = ('http://s.weibo.com/weibo/%s&Refer=index' % keyword).encode('utf-8')    
+    url = ('http://s.weibo.com/weibo/%s&Refer=index' % keyword_encoded).encode('utf-8')    
     
     try:
         r = requests.get(url,cookies=cookies).text
@@ -125,7 +122,7 @@ def has_censorship(keyword,
             if CAPTCHA_PHRASE_DECODED not in r:
                 break
             else:
-                print("CAPTCHA", keyword, "sleeping for %s seconds" % 300*i)
+                print("CAPTCHA", keyword_encoded, "sleeping for %s seconds" % 300*i)
                 time.sleep(300*i)
                 i+=1
             if i==50:
@@ -133,9 +130,9 @@ def has_censorship(keyword,
                 sys.exit(1)
     except IOError:
         wait_seconds = random.randint(90, 100)
-        print("connection reset, waiting %s" % wait_seconds)
+        print(u"%s caused connection reset, waiting %s" % (keyword_encoded,wait_seconds))
         time.sleep(wait_seconds)
-        return "reset"
+        return ("reset",None)
 
     num_results = re.findall(r'search_rese clearfix\\">\\n <span>\\u627e\\u5230(\d*)',r)
     if num_results:
@@ -150,7 +147,7 @@ def has_censorship(keyword,
     else:
         return ("has_results",num_results)
 
-def create_table(sqlite_file, overwrite=False):
+def create_database(sqlite_file, overwrite=False):
     """
     Generating a sqlite file for storing results
     Multi-index primary key on id, date, and source
@@ -161,27 +158,33 @@ def create_table(sqlite_file, overwrite=False):
     if not os.path.isfile(sqlite_file):
         conn = sqlite3.connect(sqlite_file)
         c = conn.cursor()
-        c.execute('CREATE TABLE results (id int, date date, datetime datetime, keyword string, censored bool, no_results bool, reset bool, result string, source string, num_results int, notes string, PRIMARY KEY(id,date,source))')
+        c.execute('CREATE TABLE results (id int, date date, datetime_logged datetime, test_number int, keyword string, censored bool, no_results bool, reset bool, result string, source string, num_results int, notes string, PRIMARY KEY(date,source,test_number,keyword))')
         conn.commit()
         conn.close()
 
 
-def insert_into_table(record_id,
-                keyword,
+def insert_into_database(record_id,
+                keyword_encoded,
                 result,
-                source=None,
+                date=datetime.now().date(),
+                source="default",
                 num_results=None,
                 notes=None,
-                sqlite_file=None):
+                sqlite_file=None,
+                test_number=1):
     """
     Writing the results to the sqlite database file
     """
     conn = sqlite3.connect(sqlite_file)
     conn.text_factory = str
+    conn.execute("PRAGMA busy_timeout = 5000")
     c = conn.cursor()
     
-    dt = datetime.now()
-    d = dt.date()
+    dt_logged = datetime.now()
+    if isinstance(notes, list):
+        notes = str(notes)
+    if isinstance(num_results, list):
+        num_results = None
     
     if result is "censored":
         censored = True
@@ -198,10 +201,14 @@ def insert_into_table(record_id,
     else:
         reset = False
 
-    query = """INSERT INTO results (id, date, datetime, keyword, censored, no_results, reset, result, source, num_results, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?);"""
-    if isinstance(notes, list):
-        notes = str(notes)
-    c.execute(query,(record_id, d, dt, keyword, censored, no_results, reset, result, source, num_results, notes))
+    query = u"""INSERT OR REPLACE INTO results (id, date, datetime_logged, test_number, keyword, censored, no_results, reset, result, source, num_results, notes) 
+               VALUES (
+                    coalesce(
+                        (select id from results where date=date('{date}') and keyword='{keyword}' and test_number={test_number} and source='{source}'),
+                        ?),
+                    ?,?,?,?,?,?,?,?,?,?,?
+                    );""".format(date=date,keyword=keyword_encoded,test_number=test_number,source=source)
+    c.execute(query,(record_id, date, dt_logged, test_number, keyword_encoded, censored, no_results, reset, result, source, num_results, notes))
 
     conn.commit()
     conn.close()
@@ -254,15 +261,19 @@ def load_cookies(cookie_file=weibo_credentials.Creds().username + "_cookie.txt")
         cookie = json.load(f)
     return cookie
 
-def run(test_keywords,
-                verbose='some',
+def run(keywords,
+                verbose='all',
                 insert=True,
                 sqlite_file=None,
                 return_df=False,
                 sleep=True,
                 cookies=None,
                 sleep_secs=15,
-                continue_interruptions=True):
+                continue_interruptions=True,
+                date=datetime.now().strftime('%Y-%m-%d'),
+                test_number=1,
+                list_source="list"
+        ):
     """
     Iterating through the keyword list and testing one at a time
     Handles when script or connection breaks; will pick up where it left off
@@ -271,71 +282,60 @@ def run(test_keywords,
     sleep = time in seconds to sleep between searches
     """
     if sqlite_file:
-        create_table(sqlite_file)
+        create_database(sqlite_file)
 
     count=0
     if return_df:
         results_df = pd.DataFrame()
 
-    if isinstance(test_keywords, list):
-        test_keywords = pd.DataFrame(test_keywords,columns=["keyword"])
+    if isinstance(keywords, list):
+        keywords = pd.DataFrame(keywords,columns=["keyword"])
+        keywords['source'] = list_source
+
+    test_keywords = keywords.copy()
 
     if "Index" not in test_keywords.columns:
         test_keywords['Index'] = test_keywords.index
     if "notes" not in test_keywords.columns:
         test_keywords['notes'] = None
     if "source" not in test_keywords.columns:
-        test_keywords['source'] = None        
+        test_keywords['source'] = None
+
+    source=test_keywords['source'][0]
 
     for r in test_keywords.itertuples():
-        if insert and r.Index < len(sqlite_to_df(sqlite_file)) and continue_interruptions:
-            continue
-        result,num_results = has_censorship(r.keyword,cookies)
+        if isinstance(r.keyword, str):
+            keyword_encoded = r.keyword.decode('utf-8')
+        else:
+            keyword_encoded = r.keyword
+
+        if sqlite_file:
+            if r.Index < len(sqlite_to_df(sqlite_file).query("date=='%s' & source=='%s' & test_number==%s" % (date,source,test_number))) and continue_interruptions:
+                continue
+            if len(sqlite_to_df(sqlite_file).query(u"date=='%s' & source=='%s' & test_number==%s & keyword=='%s'" % (date,source,test_number,keyword_encoded)))>0 and continue_interruptions:
+                continue
+        result,num_results = has_censorship(keyword_encoded,cookies)
         if verbose=="all":
-            print(r.Index,r.keyword, result)
+            print(r.Index,keyword_encoded, result)
         elif verbose=="some" and (count%10==0 or count==0):
-            print(r.Index,r.keyword, result)
+            print(r.Index,keyword_encoded, result)
         if insert:
-            insert_into_table(len(sqlite_to_df(sqlite_file)),r.keyword,result=result,source=r.source,num_results=num_results,notes=r.notes,sqlite_file=sqlite_file)
+            insert_into_database(len(sqlite_to_df(sqlite_file)),keyword_encoded,date=date,result=result,source=r.source,num_results=num_results,notes=r.notes,sqlite_file=sqlite_file,test_number=test_number)
         if return_df:
             results_df = pd.concat([results_df,
-                                    pd.DataFrame([{"date":datetime.now().date(),
+                                    pd.DataFrame([{"date":date,
                                                    "datetime":datetime.now(),
                                                    "keyword":r.keyword,
                                                    "result":result,
                                                    "source":r.source,
-                                                   'num_results':num_results
+                                                   'num_results':num_results,
+                                                   'test_number':test_number
                                                  }])
                                    ])
         count+=1
         if sleep:
             time.sleep(random.randint(math.ceil(sleep_secs*.90), math.ceil(sleep_secs*1.10)))
     if insert:
-        insert_into_table(int(test_keywords.index.max())+1,None,result="finished",source="_meta_",sqlite_file=sqlite_file)
+        insert_into_database(int(test_keywords.index.max())+1,None,date=date,result="finished",source="_meta_",sqlite_file=sqlite_file,test_number=test_number)
     if return_df:
         return results_df
-
-"""
-if fresh_log_in:
-    session = Userlogin().userlogin(weibo_credentials.Creds().username,weibo_credentials.Creds().password)
-
-if load_cookies:
-    with open(cookie_file, 'r') as f:
-        cookie = ast.literal_eval(f.read())
-else:
-    cookie = None
-if new_database and os.path.isfile(sqlite_file):
-    os.remove(sqlite_file)
-if not os.path.isfile(sqlite_file):
-    create_table(sqlite_file)
-
-sample_keywords = pd.DataFrame(
-    [{'keyword':'hello','Index':0,'source':'test'},
-     {'keyword':'lxb','Index':1,'source':'test'},
-     {'keyword':u'习胞子','Index':2,'source':'unicode'},
-     {'keyword':'自由亚洲电台','Index':3,'source':'should reset'},
-     {'keyword':'刘晓波','Index':4,'source':'string'},
-     {'keyword':'dhfjkdashfjkasdhfsadsf87sadfhjfasdnf'}])
-
-run(sample_keywords,verbose='none',insert=False,return_df=True)
-"""
