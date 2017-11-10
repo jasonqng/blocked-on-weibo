@@ -158,7 +158,7 @@ def create_database(sqlite_file, overwrite=False):
     if not os.path.isfile(sqlite_file):
         conn = sqlite3.connect(sqlite_file)
         c = conn.cursor()
-        c.execute('CREATE TABLE results (id int, date date, datetime_logged datetime, test_number int, keyword string, censored bool, no_results bool, reset bool, result string, source string, num_results int, notes string, PRIMARY KEY(date,source,test_number,keyword))')
+        c.execute('CREATE TABLE results (id int, date date, datetime_logged datetime, test_number int, keyword string, censored bool, no_results bool, reset bool, is_min bool, result string, source string, orig_keyword string, num_results int, notes string, PRIMARY KEY(date,source,test_number,keyword))')
         conn.commit()
         conn.close()
 
@@ -171,7 +171,9 @@ def insert_into_database(record_id,
                 num_results=None,
                 notes=None,
                 sqlite_file=None,
-                test_number=1):
+                test_number=1,
+                is_min=False,
+                orig_keyword=None):
     """
     Writing the results to the sqlite database file
     """
@@ -201,14 +203,14 @@ def insert_into_database(record_id,
     else:
         reset = False
 
-    query = u"""INSERT OR REPLACE INTO results (id, date, datetime_logged, test_number, keyword, censored, no_results, reset, result, source, num_results, notes) 
+    query = u"""INSERT OR REPLACE INTO results (id, date, datetime_logged, test_number, keyword, censored, no_results, reset, is_min, result, source, orig_keyword, num_results, notes) 
                VALUES (
                     coalesce(
                         (select id from results where date=date('{date}') and keyword='{keyword}' and test_number={test_number} and source='{source}'),
                         ?),
-                    ?,?,?,?,?,?,?,?,?,?,?
+                    ?,?,?,?,?,?,?,?,?,?,?,?,?
                     );""".format(date=date,keyword=keyword_encoded,test_number=test_number,source=source)
-    c.execute(query,(record_id, date, dt_logged, test_number, keyword_encoded, censored, no_results, reset, result, source, num_results, notes))
+    c.execute(query,(record_id, date, dt_logged, test_number, keyword_encoded, censored, no_results, reset, is_min, result, source, orig_keyword, num_results, notes))
 
     conn.commit()
     conn.close()
@@ -272,7 +274,8 @@ def run(keywords,
                 continue_interruptions=True,
                 date=datetime.now().strftime('%Y-%m-%d'),
                 test_number=1,
-                list_source="list"
+                list_source="list",
+                get_min=False
         ):
     """
     Iterating through the keyword list and testing one at a time
@@ -300,7 +303,7 @@ def run(keywords,
         test_keywords['notes'] = None
     if "source" not in test_keywords.columns:
         test_keywords['source'] = None
-
+    test_keywords['min_str'] = None
     source=test_keywords['source'][0]
 
     for r in test_keywords.itertuples():
@@ -319,17 +322,47 @@ def run(keywords,
             print(r.Index,keyword_encoded, result)
         elif verbose=="some" and (count%10==0 or count==0):
             print(r.Index,keyword_encoded, result)
+
+        if get_min and result == "censored":
+            if verbose=="some" or verbose=="all":
+                print("Found censored search phrase; determining minimum keyword set")
+
+            potential_kws = split_search_query(keyword_encoded, cookies)
+
+            for kw in potential_kws:
+
+                test_list = [kw[:i] + kw[i + 1:] for i in range(len(kw))]
+                min_str = ""
+                for i in range(len(test_list)):
+                    if verbose=="all":
+                        print("Testing %d of %d: omitting character %s" %(i+1, len(test_list), test_list[i]))
+                    if has_censorship(test_list[i], cookies)[0] != "censored":
+                        min_str += (kw[i])
+                result_min_str, num_results_min_str = has_censorship(min_str, cookies)
+                if result_min_str == "censored":  # minStr found properly
+                    print("the minimum phrase from '%s' is: '%s'" % (kw, min_str))
+                    if insert:
+                        insert_into_database(len(sqlite_to_df(sqlite_file)), min_str, date=date, result=result_min_str,
+                                             source=r.source, num_results=num_results_min_str, notes=r.notes,
+                                             sqlite_file=sqlite_file, test_number=test_number, is_min=True,
+                                             orig_keyword=keyword_encoded)
+                    r.min_str = min_str
+                else:
+                    print("Failed to find minimum phrase")
+
         if insert:
             insert_into_database(len(sqlite_to_df(sqlite_file)),keyword_encoded,date=date,result=result,source=r.source,num_results=num_results,notes=r.notes,sqlite_file=sqlite_file,test_number=test_number)
         if return_df:
             results_df = pd.concat([results_df,
                                     pd.DataFrame([{"date":date,
                                                    "datetime":datetime.now(),
-                                                   "keyword":r.keyword,
+                                                   "keyword":r.min_str if r.min_str is not None else r.keyword,
                                                    "result":result,
                                                    "source":r.source,
-                                                   'num_results':num_results,
-                                                   'test_number':test_number
+                                                   "num_results":num_results,
+                                                   "test_number":test_number,
+                                                   "is_min": True if r.min_str is not None else False,
+                                                   "orig_keyword":r.keyword if r.min_str is not None else None
                                                  }])
                                    ])
         count+=1
@@ -339,3 +372,21 @@ def run(keywords,
         insert_into_database(int(test_keywords.index.max())+1,None,date=date,result="finished",source="_meta_",sqlite_file=sqlite_file,test_number=test_number)
     if return_df:
         return results_df
+
+
+def split_search_query(query, cookies, res_rtn=[]):
+    """Recursively halves a query and returns portions with blocked keywords as a list of strings.
+    """
+    if len(query) <= 1:
+        return [-1]
+    if has_censorship(query, cookies)[0] != "censored":
+        return [-1]
+    else:
+        mid = len(query) // 2
+        left_half = query[:mid]
+        right_half = query[mid:]
+        left_res = split_search_query(left_half, cookies, res_rtn)
+        right_res = split_search_query(right_half, cookies, res_rtn)
+        if (left_res[0] == -1) and (right_res[0] == -1):
+            res_rtn.append(query)
+    return res_rtn
