@@ -25,16 +25,17 @@ import rsa
 import json  
 import binascii  
 import math
-from . import weibo_credentials
+try:
+    from . import weibo_credentials
+except ValueError:
+    import weibo_credentials
 ### SETTINGS
 
 CENSORSHIP_PHRASE_UTF8 = '根据相关法律法规和政策'
-CENSORSHIP_PHRASE_DECODED = codecs.encode(CENSORSHIP_PHRASE_UTF8.decode('utf8'), 'unicode_escape')
-
 CAPTCHA_PHRASE_UTF8 = '你的行为有些异常'
-CAPTCHA_PHRASE_DECODED = codecs.encode(CAPTCHA_PHRASE_UTF8.decode('utf8'), 'unicode_escape')
-
 NO_RESULTS_PHRASE_UTF8 = '抱歉，未找到'
+CENSORSHIP_PHRASE_DECODED = codecs.encode(CENSORSHIP_PHRASE_UTF8.decode('utf8'), 'unicode_escape')
+CAPTCHA_PHRASE_DECODED = codecs.encode(CAPTCHA_PHRASE_UTF8.decode('utf8'), 'unicode_escape')
 NO_RESULTS_PHRASE_DECODED = codecs.encode(NO_RESULTS_PHRASE_UTF8.decode('utf8'), 'unicode_escape')
 
 def user_login(username=weibo_credentials.Creds().username,
@@ -88,15 +89,18 @@ def user_login(username=weibo_credentials.Creds().username,
                         'url': 'http://weibo.com/ajaxlogin.php?framelogin=1&callback=parent.sinaSSOController.feedBackUrlCallBack',  
                         'returntype': 'META',  
                         'rsakv' : rsakv,  
-                        }  
-    resp = session.post(url_login,data=postdata)  
-    # print resp.headers 
+                        }
+    resp = session.post(url_login,data=postdata)
+    # print resp.headers
     #print(resp.content)
-    login_url = re.findall(r'http://weibo.*&retcode=0',resp.text)  
+    login_url = re.findall(r'http://weibo.*&retcode=0',resp.text)
     #print(login_url)
-    respo = session.get(login_url[0])  
-    uid = re.findall('"uniqueid":"(\d+)",',respo.text)[0]  
-    url = "http://weibo.com/u/"+uid  
+    try:
+        respo = session.get(login_url[0])
+    except IndexError:
+        raise AttributeError("Couldn't login. Check that your credentials are valid.")
+    uid = re.findall('"uniqueid":"(\d+)",',respo.text)[0]
+    url = "http://weibo.com/u/"+uid
     respo = session.get(url)
     if write_cookie:
         cookie_dict = session.cookies.get_dict()
@@ -105,6 +109,10 @@ def user_login(username=weibo_credentials.Creds().username,
 
 def has_censorship(keyword_encoded,
                 cookies=None):
+
+    ##DEBUG
+    print("testing" + keyword_encoded.encode('utf-8'))
+
     """
     Function which actually looks up whether a search for the given keyword returns text
     which is displayed during censorship.
@@ -141,10 +149,13 @@ def has_censorship(keyword_encoded,
         None
     
     if CENSORSHIP_PHRASE_DECODED in r:
+        print("censored") ##DEBUG
         return ("censored",None)
     elif NO_RESULTS_PHRASE_DECODED in r:
+        print("no-results")  ##DEBUG
         return ("no_results",None)
     else:
+        print("has-results")  ##DEBUG
         return ("has_results",num_results)
 
 def create_database(sqlite_file, overwrite=False):
@@ -158,22 +169,24 @@ def create_database(sqlite_file, overwrite=False):
     if not os.path.isfile(sqlite_file):
         conn = sqlite3.connect(sqlite_file)
         c = conn.cursor()
-        c.execute('CREATE TABLE results (id int, date date, datetime_logged datetime, test_number int, keyword string, censored bool, no_results bool, reset bool, is_min bool, result string, source string, orig_keyword string, num_results int, notes string, PRIMARY KEY(date,source,test_number,keyword))')
+        c.execute('''CREATE TABLE results (id int, date date, datetime_logged datetime, test_number int, keyword string, 
+            censored bool, no_results bool, reset bool, is_canonical bool, result string, source string, orig_keyword string, 
+            num_results int, notes string, PRIMARY KEY(date,source,test_number,keyword,orig_keyword))''')
         conn.commit()
         conn.close()
 
 
 def insert_into_database(record_id,
-                keyword_encoded,
-                result,
-                date=datetime.now().date(),
-                source="default",
-                num_results=None,
-                notes=None,
-                sqlite_file=None,
-                test_number=1,
-                is_min=False,
-                orig_keyword=None):
+                         keyword_encoded,
+                         result,
+                         date=datetime.now().date(),
+                         source="default",
+                         num_results=None,
+                         notes=None,
+                         sqlite_file=None,
+                         test_number=1,
+                         is_canonical=None,
+                         orig_keyword=None):
     """
     Writing the results to the sqlite database file
     """
@@ -203,14 +216,14 @@ def insert_into_database(record_id,
     else:
         reset = False
 
-    query = u"""INSERT OR REPLACE INTO results (id, date, datetime_logged, test_number, keyword, censored, no_results, reset, is_min, result, source, orig_keyword, num_results, notes) 
+    query = u"""INSERT OR REPLACE INTO results (id, date, datetime_logged, test_number, keyword, censored, no_results, reset, is_canonical, result, source, orig_keyword, num_results, notes) 
                VALUES (
                     coalesce(
                         (select id from results where date=date('{date}') and keyword='{keyword}' and test_number={test_number} and source='{source}'),
                         ?),
                     ?,?,?,?,?,?,?,?,?,?,?,?,?
                     );""".format(date=date,keyword=keyword_encoded,test_number=test_number,source=source)
-    c.execute(query,(record_id, date, dt_logged, test_number, keyword_encoded, censored, no_results, reset, is_min, result, source, orig_keyword, num_results, notes))
+    c.execute(query, (record_id, date, dt_logged, test_number, keyword_encoded, censored, no_results, reset, is_canonical, result, source, orig_keyword, num_results, notes))
 
     conn.commit()
     conn.close()
@@ -275,7 +288,7 @@ def run(keywords,
                 date=datetime.now().strftime('%Y-%m-%d'),
                 test_number=1,
                 list_source="list",
-                get_min=False
+                get_canonical=False
         ):
     """
     Iterating through the keyword list and testing one at a time
@@ -303,7 +316,6 @@ def run(keywords,
         test_keywords['notes'] = None
     if "source" not in test_keywords.columns:
         test_keywords['source'] = None
-    test_keywords['min_str'] = None
     source=test_keywords['source'][0]
 
     for r in test_keywords.itertuples():
@@ -323,19 +335,19 @@ def run(keywords,
         elif verbose=="some" and (count%10==0 or count==0):
             print(r.Index,keyword_encoded, result)
 
-        if get_min and result == "censored":
+        if get_canonical and result == "censored":
             if verbose=="some" or verbose=="all":
-                print("Found censored search phrase; determining minimum keyword set")
+                print("Found censored search phrase; determining canonical censored keyword set")
 
-            potential_kws = split_search_query(keyword_encoded, cookies)
+            potential_kws = split_search_query(keyword_encoded, cookies, res_rtn=[], known_blocked=True)
+            print(potential_kws)
 
             for kw in potential_kws:
-
                 test_list = [kw[:i] + kw[i + 1:] for i in range(len(kw))]
                 min_str = ""
                 for i in range(len(test_list)):
                     if verbose=="all":
-                        print("Testing %d of %d: omitting character %s" %(i+1, len(test_list), test_list[i]))
+                        print("Testing %d of %d: omitting character %s" %(i+1, len(test_list), kw[i]))
                     if has_censorship(test_list[i], cookies)[0] != "censored":
                         min_str += (kw[i])
                 result_min_str, num_results_min_str = has_censorship(min_str, cookies)
@@ -344,25 +356,26 @@ def run(keywords,
                     if insert:
                         insert_into_database(len(sqlite_to_df(sqlite_file)), min_str, date=date, result=result_min_str,
                                              source=r.source, num_results=num_results_min_str, notes=r.notes,
-                                             sqlite_file=sqlite_file, test_number=test_number, is_min=True,
+                                             sqlite_file=sqlite_file, test_number=test_number, is_canonical=True,
                                              orig_keyword=keyword_encoded)
-                    r.min_str = min_str
                 else:
-                    print("Failed to find minimum phrase")
+                    print("Failed to find canonical phrase")
 
         if insert:
-            insert_into_database(len(sqlite_to_df(sqlite_file)),keyword_encoded,date=date,result=result,source=r.source,num_results=num_results,notes=r.notes,sqlite_file=sqlite_file,test_number=test_number)
+            insert_into_database(len(sqlite_to_df(sqlite_file)), keyword_encoded, date=date, result=result, source=r.source,
+                                 num_results=num_results, notes=r.notes, sqlite_file=sqlite_file, test_number=test_number,
+                                 is_canonical=False)
         if return_df:
             results_df = pd.concat([results_df,
                                     pd.DataFrame([{"date":date,
                                                    "datetime":datetime.now(),
-                                                   "keyword":r.min_str if r.min_str is not None else r.keyword,
+                                                   "keyword":min_str if min_str is not None else r.keyword,
                                                    "result":result,
                                                    "source":r.source,
                                                    "num_results":num_results,
                                                    "test_number":test_number,
-                                                   "is_min": True if r.min_str is not None else False,
-                                                   "orig_keyword":r.keyword if r.min_str is not None else None
+                                                   "is_canonical": True if min_str is not None else False,
+                                                   "orig_keyword":r.keyword if min_str is not None else None
                                                  }])
                                    ])
         count+=1
@@ -374,19 +387,19 @@ def run(keywords,
         return results_df
 
 
-def split_search_query(query, cookies, res_rtn=[]):
+def split_search_query(query, cookies, res_rtn=[], known_blocked=False):
     """Recursively halves a query and returns portions with blocked keywords as a list of strings.
     """
     if len(query) <= 1:
         return [-1]
-    if has_censorship(query, cookies)[0] != "censored":
+    if (not known_blocked) and has_censorship(query, cookies)[0] != "censored":  # known_blocked=True skips 1st check
         return [-1]
     else:
         mid = len(query) // 2
         left_half = query[:mid]
         right_half = query[mid:]
-        left_res = split_search_query(left_half, cookies, res_rtn)
-        right_res = split_search_query(right_half, cookies, res_rtn)
+        left_res = split_search_query(left_half, cookies, res_rtn, known_blocked=False)
+        right_res = split_search_query(right_half, cookies, res_rtn, known_blocked=False)
         if (left_res[0] == -1) and (right_res[0] == -1):
             res_rtn.append(query)
     return res_rtn
