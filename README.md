@@ -17,7 +17,7 @@ this setup guide)
 ### Version 0.2 changes 
 * now includes a feature to find canonical censored keywords (minimum set of keywords required to trigger explicit censorship message)
     * to run, pass `get_canonical=True` with rest of variables into `run()`
-    * see tktk
+    * see section 4.8
 
 
 # Table of Contents
