@@ -110,9 +110,6 @@ def user_login(username=weibo_credentials.Creds().username,
 def has_censorship(keyword_encoded,
                 cookies=None):
 
-    ##DEBUG
-    print("testing" + keyword_encoded.encode('utf-8'))
-
     """
     Function which actually looks up whether a search for the given keyword returns text
     which is displayed during censorship.
@@ -149,13 +146,10 @@ def has_censorship(keyword_encoded,
         None
     
     if CENSORSHIP_PHRASE_DECODED in r:
-        print("censored") ##DEBUG
         return ("censored",None)
     elif NO_RESULTS_PHRASE_DECODED in r:
-        print("no-results")  ##DEBUG
         return ("no_results",None)
     else:
-        print("has-results")  ##DEBUG
         return ("has_results",num_results)
 
 def create_database(sqlite_file, overwrite=False):
@@ -340,7 +334,8 @@ def run(keywords,
                 print("Found censored search phrase; determining canonical censored keyword set")
 
             potential_kws = split_search_query(keyword_encoded, cookies, res_rtn=[], known_blocked=True)
-            print(potential_kws)
+            if verbose=="all":
+                print(potential_kws)
 
             for kw in potential_kws:
                 test_list = [kw[:i] + kw[i + 1:] for i in range(len(kw))]
@@ -352,7 +347,8 @@ def run(keywords,
                         min_str += (kw[i])
                 result_min_str, num_results_min_str = has_censorship(min_str, cookies)
                 if result_min_str == "censored":  # minStr found properly
-                    print("the minimum phrase from '%s' is: '%s'" % (kw, min_str))
+                    if verbose=="all" or verbose=="some":
+                        print("the minimum phrase from '%s' is: '%s'" % (kw, min_str))
                     if insert:
                         insert_into_database(len(sqlite_to_df(sqlite_file)), min_str, date=date, result=result_min_str,
                                              source=r.source, num_results=num_results_min_str, notes=r.notes,
