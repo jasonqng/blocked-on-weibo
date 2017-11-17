@@ -332,8 +332,8 @@ def run(keywords,
         if get_canonical and result == "censored":
             if verbose=="some" or verbose=="all":
                 print("Found censored search phrase; determining canonical censored keyword set")
-
-            potential_kws = split_search_query(keyword_encoded, cookies, res_rtn=[], known_blocked=True)
+            sleep_recursive = sleep_secs if sleep is True else 0
+            potential_kws = split_search_query(keyword_encoded, cookies, sleep_recursive, res_rtn=[], known_blocked=True)
             if verbose=="all":
                 print(potential_kws)
 
@@ -343,6 +343,8 @@ def run(keywords,
                 for i in range(len(test_list)):
                     if verbose=="all":
                         print("Testing %d of %d: omitting character %s" %(i+1, len(test_list), kw[i]))
+                    if sleep_recursive:
+                        time.sleep(random.randint(math.ceil(sleep * .90), math.ceil(sleep * 1.10)))
                     if has_censorship(test_list[i], cookies)[0] != "censored":
                         min_str += (kw[i])
                 result_min_str, num_results_min_str = has_censorship(min_str, cookies)
@@ -383,19 +385,21 @@ def run(keywords,
         return results_df
 
 
-def split_search_query(query, cookies, res_rtn=[], known_blocked=False):
+def split_search_query(query, cookies, sleep=0, res_rtn=[], known_blocked=False):
     """Recursively halves a query and returns portions with blocked keywords as a list of strings.
     """
     if len(query) <= 1:
         return [-1]
+    if sleep:
+        time.sleep(random.randint(math.ceil(sleep * .90), math.ceil(sleep * 1.10)))
     if (not known_blocked) and has_censorship(query, cookies)[0] != "censored":  # known_blocked=True skips 1st check
         return [-1]
     else:
         mid = len(query) // 2
         left_half = query[:mid]
         right_half = query[mid:]
-        left_res = split_search_query(left_half, cookies, res_rtn, known_blocked=False)
-        right_res = split_search_query(right_half, cookies, res_rtn, known_blocked=False)
+        left_res = split_search_query(left_half, cookies, sleep, res_rtn, known_blocked=False)
+        right_res = split_search_query(right_half, cookies, sleep, res_rtn, known_blocked=False)
         if (left_res[0] == -1) and (right_res[0] == -1):
             res_rtn.append(query)
     return res_rtn
