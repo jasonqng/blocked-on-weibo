@@ -180,8 +180,10 @@ weibo.run(sample_keywords_df,insert=False,return_df=True)
       <th></th>
       <th>date</th>
       <th>datetime</th>
+      <th>is_canonical</th>
       <th>keyword</th>
       <th>num_results</th>
+      <th>orig_keyword</th>
       <th>result</th>
       <th>source</th>
       <th>test_number</th>
@@ -192,8 +194,10 @@ weibo.run(sample_keywords_df,insert=False,return_df=True)
       <th>0</th>
       <td>2017-09-25</td>
       <td>2017-09-25 10:12:45.280812</td>
+      <td>False</td>
       <td>hello</td>
       <td>[]</td>
+      <td>None</td>
       <td>has_results</td>
       <td>my dataframe</td>
       <td>1</td>
@@ -202,7 +206,9 @@ weibo.run(sample_keywords_df,insert=False,return_df=True)
       <th>0</th>
       <td>2017-09-25</td>
       <td>2017-09-25 10:13:00.191900</td>
+      <td>False</td>
       <td>lxb</td>
+      <td>None</td>
       <td>None</td>
       <td>censored</td>
       <td>my dataframe</td>
@@ -212,7 +218,9 @@ weibo.run(sample_keywords_df,insert=False,return_df=True)
       <th>0</th>
       <td>2017-09-25</td>
       <td>2017-09-25 10:13:16.356805</td>
+      <td>False</td>
       <td>习胞子</td>
+      <td>None</td>
       <td>None</td>
       <td>no_results</td>
       <td>my dataframe</td>
