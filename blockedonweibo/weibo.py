@@ -329,6 +329,7 @@ def run(keywords,
         elif verbose=="some" and (count%10==0 or count==0):
             print(r.Index,keyword_encoded, result)
 
+        min_str = None
         if get_canonical and result == "censored":
             if verbose=="some" or verbose=="all":
                 print("Found censored search phrase; determining canonical censored keyword set")
