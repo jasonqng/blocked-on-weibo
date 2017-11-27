@@ -3,6 +3,11 @@ import os, sys
 
 
 def find_db():
+    """
+    Search for database files in the current directory of this script file. Gets user input for confirmation of db file
+    if only 1 match; user input for selection if >1 db file present.
+    """
+
     print("Finding database files...")
     files = list(os.walk('.'))[0][2]
     db_files = [file for file in files if ".db" in file or ".sqlite" in file]
@@ -29,6 +34,11 @@ def find_db():
 
 
 def migrate_db(db_location):
+    """
+    sqlite3 code that conducts the actual database modifications. Renames the previous table, creates a new table
+    with new columns, moves contents of previous table over, then deletes the previous table.
+    :param db_location: filename of database file.
+    """
     conn = sqlite3.connect(db_location)
     c = conn.cursor()
     c.execute('ALTER TABLE results RENAME TO resultsOld')
@@ -48,6 +58,9 @@ def migrate_db(db_location):
 
 
 def break_script():
+    """
+    Print an error message to console before triggering sys.exit().
+    """
     print("Please place this .py script in the same directory as your database file, then re-run. No changes were made")
     sys.exit()
 

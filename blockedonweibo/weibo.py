@@ -386,7 +386,11 @@ def run(keywords,
 
 
 def split_search_query(query, cookies, sleep=0, res_rtn=[], known_blocked=False):
-    """Recursively halves a query and returns portions with blocked keywords as a list of strings.
+    """
+    Recursively halves a query and returns portions with blocked keywords as a list of strings.
+    :param res_rtn: internal list holding found min keywords during recursive search, DO NOT SPECIFY.
+    :param known_blocked: set to True to skip a redundant first-check if you know your query is blocked.
+    :return: a list of one or more shortened keyword segments that trigger censorship
     """
     if len(query) <= 1:
         return [-1]
