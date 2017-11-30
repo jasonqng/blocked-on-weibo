@@ -319,7 +319,7 @@ def run(keywords,
             keyword_encoded = r.keyword
 
         if sqlite_file:
-            if r.Index < len(sqlite_to_df(sqlite_file).query("date=='%s' & source=='%s' & test_number==%s" % (date,source,test_number))) and continue_interruptions:
+            if r.Index < len(sqlite_to_df(sqlite_file).query("date=='%s' & source=='%s' & test_number==%s & is_canonical!=1" % (date,source,test_number))) and continue_interruptions:
                 continue
             if len(sqlite_to_df(sqlite_file).query(u"date=='%s' & source=='%s' & test_number==%s & keyword=='%s'" % (date,source,test_number,keyword_encoded)))>0 and continue_interruptions:
                 continue
@@ -386,7 +386,7 @@ def run(keywords,
         return results_df
 
 
-def split_search_query(query, cookies, sleep_secs=0, res_rtn=[], known_blocked=False):
+def split_search_query(query, cookies, sleep_secs=0, res_rtn=[], known_blocked=False, ):
     """
     Recursively halves a query and returns portions with blocked keywords as a list of strings.
     :param res_rtn: internal list holding found min keywords during recursive search, DO NOT SPECIFY.
