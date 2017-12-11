@@ -25,16 +25,17 @@ import rsa
 import json  
 import binascii  
 import math
-from . import weibo_credentials
+try:
+    from . import weibo_credentials
+except ValueError:
+    import weibo_credentials
 ### SETTINGS
 
 CENSORSHIP_PHRASE_UTF8 = '根据相关法律法规和政策'
-CENSORSHIP_PHRASE_DECODED = codecs.encode(CENSORSHIP_PHRASE_UTF8.decode('utf8'), 'unicode_escape')
-
 CAPTCHA_PHRASE_UTF8 = '你的行为有些异常'
-CAPTCHA_PHRASE_DECODED = codecs.encode(CAPTCHA_PHRASE_UTF8.decode('utf8'), 'unicode_escape')
-
 NO_RESULTS_PHRASE_UTF8 = '抱歉，未找到'
+CENSORSHIP_PHRASE_DECODED = codecs.encode(CENSORSHIP_PHRASE_UTF8.decode('utf8'), 'unicode_escape')
+CAPTCHA_PHRASE_DECODED = codecs.encode(CAPTCHA_PHRASE_UTF8.decode('utf8'), 'unicode_escape')
 NO_RESULTS_PHRASE_DECODED = codecs.encode(NO_RESULTS_PHRASE_UTF8.decode('utf8'), 'unicode_escape')
 
 def user_login(username=weibo_credentials.Creds().username,
@@ -88,15 +89,18 @@ def user_login(username=weibo_credentials.Creds().username,
                         'url': 'http://weibo.com/ajaxlogin.php?framelogin=1&callback=parent.sinaSSOController.feedBackUrlCallBack',  
                         'returntype': 'META',  
                         'rsakv' : rsakv,  
-                        }  
-    resp = session.post(url_login,data=postdata)  
-    # print resp.headers 
+                        }
+    resp = session.post(url_login,data=postdata)
+    # print resp.headers
     #print(resp.content)
-    login_url = re.findall(r'http://weibo.*&retcode=0',resp.text)  
+    login_url = re.findall(r'http://weibo.*&retcode=0',resp.text)
     #print(login_url)
-    respo = session.get(login_url[0])  
-    uid = re.findall('"uniqueid":"(\d+)",',respo.text)[0]  
-    url = "http://weibo.com/u/"+uid  
+    try:
+        respo = session.get(login_url[0])
+    except IndexError:
+        raise AttributeError("Couldn't login. Check that your credentials are valid.")
+    uid = re.findall('"uniqueid":"(\d+)",',respo.text)[0]
+    url = "http://weibo.com/u/"+uid
     respo = session.get(url)
     if write_cookie:
         cookie_dict = session.cookies.get_dict()
@@ -105,6 +109,7 @@ def user_login(username=weibo_credentials.Creds().username,
 
 def has_censorship(keyword_encoded,
                 cookies=None):
+
     """
     Function which actually looks up whether a search for the given keyword returns text
     which is displayed during censorship.
@@ -158,20 +163,24 @@ def create_database(sqlite_file, overwrite=False):
     if not os.path.isfile(sqlite_file):
         conn = sqlite3.connect(sqlite_file)
         c = conn.cursor()
-        c.execute('CREATE TABLE results (id int, date date, datetime_logged datetime, test_number int, keyword string, censored bool, no_results bool, reset bool, result string, source string, num_results int, notes string, PRIMARY KEY(date,source,test_number,keyword))')
+        c.execute('''CREATE TABLE results (id int, date date, datetime_logged datetime, test_number int, keyword string, 
+            censored bool, no_results bool, reset bool, is_canonical bool, result string, source string, orig_keyword string, 
+            num_results int, notes string, PRIMARY KEY(date,source,test_number,keyword,orig_keyword))''')
         conn.commit()
         conn.close()
 
 
 def insert_into_database(record_id,
-                keyword_encoded,
-                result,
-                date=datetime.now().date(),
-                source="default",
-                num_results=None,
-                notes=None,
-                sqlite_file=None,
-                test_number=1):
+                         keyword_encoded,
+                         result,
+                         date=datetime.now().date(),
+                         source="default",
+                         num_results=None,
+                         notes=None,
+                         sqlite_file=None,
+                         test_number=1,
+                         is_canonical=None,
+                         orig_keyword=None):
     """
     Writing the results to the sqlite database file
     """
@@ -201,14 +210,14 @@ def insert_into_database(record_id,
     else:
         reset = False
 
-    query = u"""INSERT OR REPLACE INTO results (id, date, datetime_logged, test_number, keyword, censored, no_results, reset, result, source, num_results, notes) 
+    query = u"""INSERT OR REPLACE INTO results (id, date, datetime_logged, test_number, keyword, censored, no_results, reset, is_canonical, result, source, orig_keyword, num_results, notes) 
                VALUES (
                     coalesce(
                         (select id from results where date=date('{date}') and keyword='{keyword}' and test_number={test_number} and source='{source}'),
                         ?),
-                    ?,?,?,?,?,?,?,?,?,?,?
+                    ?,?,?,?,?,?,?,?,?,?,?,?,?
                     );""".format(date=date,keyword=keyword_encoded,test_number=test_number,source=source)
-    c.execute(query,(record_id, date, dt_logged, test_number, keyword_encoded, censored, no_results, reset, result, source, num_results, notes))
+    c.execute(query, (record_id, date, dt_logged, test_number, keyword_encoded, censored, no_results, reset, is_canonical, result, source, orig_keyword, num_results, notes))
 
     conn.commit()
     conn.close()
@@ -272,7 +281,8 @@ def run(keywords,
                 continue_interruptions=True,
                 date=datetime.now().strftime('%Y-%m-%d'),
                 test_number=1,
-                list_source="list"
+                list_source="list",
+                get_canonical=False
         ):
     """
     Iterating through the keyword list and testing one at a time
@@ -300,7 +310,6 @@ def run(keywords,
         test_keywords['notes'] = None
     if "source" not in test_keywords.columns:
         test_keywords['source'] = None
-
     source=test_keywords['source'][0]
 
     for r in test_keywords.itertuples():
@@ -310,26 +319,64 @@ def run(keywords,
             keyword_encoded = r.keyword
 
         if sqlite_file:
-            if r.Index < len(sqlite_to_df(sqlite_file).query("date=='%s' & source=='%s' & test_number==%s" % (date,source,test_number))) and continue_interruptions:
+            if r.Index < len(sqlite_to_df(sqlite_file).query("date=='%s' & source=='%s' & test_number==%s & is_canonical!=1" % (date,source,test_number))) and continue_interruptions:
                 continue
-            if len(sqlite_to_df(sqlite_file).query(u"date=='%s' & source=='%s' & test_number==%s & keyword=='%s'" % (date,source,test_number,keyword_encoded)))>0 and continue_interruptions:
+            if len(sqlite_to_df(sqlite_file).query(u"date=='%s' & source=='%s' & test_number==%s & keyword=='%s' & is_canonical!=1" % (date,source,test_number,keyword_encoded)))>0 and continue_interruptions:
                 continue
         result,num_results = has_censorship(keyword_encoded,cookies)
         if verbose=="all":
             print(r.Index,keyword_encoded, result)
         elif verbose=="some" and (count%10==0 or count==0):
             print(r.Index,keyword_encoded, result)
+
+        min_str = None
+        if get_canonical and result == "censored":
+            if verbose=="some" or verbose=="all":
+                print("Found censored search phrase; determining canonical censored keyword set")
+            sleep_recursive = sleep_secs if sleep is True else 0
+            potential_kws = split_search_query(keyword_encoded, cookies, sleep_recursive, res_rtn=[], known_blocked=True, verbose=verbose)
+            if verbose=="all":
+                print(potential_kws)
+
+            for kw in potential_kws:
+                test_list = [kw[:i] + kw[i + 1:] for i in range(len(kw))]
+                min_str = ""
+                for i in range(len(test_list)):
+                    if kw[i].isspace():
+                        continue
+                    if verbose=="all":
+                        print("Testing %d of %d: omitting character %s" %(i+1, len(test_list), kw[i]))
+                    if sleep:
+                        time.sleep(random.randint(math.ceil(sleep_secs * .90), math.ceil(sleep_secs * 1.10)))
+                    if has_censorship(test_list[i], cookies)[0] != "censored":
+                        min_str += (kw[i])
+                result_min_str, num_results_min_str = has_censorship(min_str, cookies)
+                if result_min_str == "censored":  # minStr found properly
+                    if verbose=="all" or verbose=="some":
+                        print("the minimum phrase from '%s' is: '%s'" % (kw, min_str))
+                    if insert:
+                        insert_into_database(len(sqlite_to_df(sqlite_file)), min_str, date=date, result=result_min_str,
+                                             source=r.source, num_results=num_results_min_str, notes=r.notes,
+                                             sqlite_file=sqlite_file, test_number=test_number, is_canonical=True,
+                                             orig_keyword=keyword_encoded)
+                else:
+                    print("Failed to find canonical phrase")
+
         if insert:
-            insert_into_database(len(sqlite_to_df(sqlite_file)),keyword_encoded,date=date,result=result,source=r.source,num_results=num_results,notes=r.notes,sqlite_file=sqlite_file,test_number=test_number)
+            insert_into_database(len(sqlite_to_df(sqlite_file)), keyword_encoded, date=date, result=result, source=r.source,
+                                 num_results=num_results, notes=r.notes, sqlite_file=sqlite_file, test_number=test_number,
+                                 is_canonical=False)
         if return_df:
             results_df = pd.concat([results_df,
                                     pd.DataFrame([{"date":date,
                                                    "datetime":datetime.now(),
-                                                   "keyword":r.keyword,
+                                                   "keyword":min_str if min_str is not None else r.keyword,
                                                    "result":result,
                                                    "source":r.source,
-                                                   'num_results':num_results,
-                                                   'test_number':test_number
+                                                   "num_results":num_results,
+                                                   "test_number":test_number,
+                                                   "is_canonical": True if min_str is not None else False,
+                                                   "orig_keyword":r.keyword if min_str is not None else None
                                                  }])
                                    ])
         count+=1
@@ -339,3 +386,29 @@ def run(keywords,
         insert_into_database(int(test_keywords.index.max())+1,None,date=date,result="finished",source="_meta_",sqlite_file=sqlite_file,test_number=test_number)
     if return_df:
         return results_df
+
+
+def split_search_query(query, cookies, sleep_secs=0, res_rtn=[], known_blocked=False, verbose=""):
+    """
+    Recursively halves a query and returns portions with blocked keywords as a list of strings.
+    :param res_rtn: internal list holding found min keywords during recursive search, DO NOT SPECIFY.
+    :param known_blocked: set to True to skip a redundant first-check if you know your query is blocked.
+    :return: a list of one or more shortened keyword segments that trigger censorship
+    """
+    if len(query) <= 1:
+        return [-1]
+    if sleep_secs:
+        time.sleep(random.randint(math.ceil(sleep_secs * .90), math.ceil(sleep_secs * 1.10)))
+    if (not known_blocked) and verbose=='all':
+        print('Recursively shortening... testing query: "%s"' %(query))
+    if (not known_blocked) and has_censorship(query, cookies)[0] != "censored":  # known_blocked=True skips 1st check
+        return [-1]
+    else:
+        mid = len(query) // 2
+        left_half = query[:mid]
+        right_half = query[mid:]
+        left_res = split_search_query(left_half, cookies, sleep_secs, res_rtn, False, verbose)
+        right_res = split_search_query(right_half, cookies, sleep_secs, res_rtn, False, verbose)
+        if (left_res[0] == -1) and (right_res[0] == -1):
+            res_rtn.append(query)
+    return res_rtn

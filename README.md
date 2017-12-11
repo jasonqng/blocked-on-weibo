@@ -4,8 +4,24 @@ This python package allows you to automate tests to check if a keyword is censor
 
 <img src="screenshot.png" alt="screenshot" style="width: 700px;"/>
 
+# IMPORTANT: Upgrading from v0.1 with an existing database? 
+The database table has been modified to accomodate tracking of minimum keyword strings triggering 
+censorship. If you used blockedonweibo v0.1 and you used a database to store results, you will 
+need to update your database file. 
+
+**To migrate your older database file**
+1. Move `update_db.py` to the same file directory as your database file ("results.sqlite" if you followed
+this setup guide)
+2. In terminal, run `python update_db.py` and confirm database file. 
+
+### Version 0.2 changes 
+* now includes a feature to find canonical censored keywords (minimum set of keywords required to trigger explicit censorship message)
+    * to run, pass `get_canonical=True` with rest of variables into `run()`
+    * see section 4.8
+
+
 # Table of Contents
- <p><div class="lev1 toc-item"><a href="#What-is-blockedonweibo?" data-toc-modified-id="What-is-blockedonweibo?-1"><span class="toc-item-num">1&nbsp;&nbsp;</span>What is blockedonweibo?</a></div><div class="lev1 toc-item"><a href="#Install-the-blockedonweibo-package" data-toc-modified-id="Install-the-blockedonweibo-package-2"><span class="toc-item-num">2&nbsp;&nbsp;</span>Install the blockedonweibo package</a></div><div class="lev1 toc-item"><a href="#Adjust-your-settings" data-toc-modified-id="Adjust-your-settings-3"><span class="toc-item-num">3&nbsp;&nbsp;</span>Adjust your settings</a></div><div class="lev1 toc-item"><a href="#Let's-start-testing!" data-toc-modified-id="Let's-start-testing!-4"><span class="toc-item-num">4&nbsp;&nbsp;</span>Let's start testing!</a></div><div class="lev2 toc-item"><a href="#Pass-a-dictionary-of-keywords-to-start-testing" data-toc-modified-id="Pass-a-dictionary-of-keywords-to-start-testing-41"><span class="toc-item-num">4.1&nbsp;&nbsp;</span>Pass a dictionary of keywords to start testing</a></div><div class="lev2 toc-item"><a href="#Pass-in-cookies-so-you-can-also-get-the-number-of-results.-Pass-in-sqlite_file-to-save-the-results-to-disk-so-you-can-load-it-later" data-toc-modified-id="Pass-in-cookies-so-you-can-also-get-the-number-of-results.-Pass-in-sqlite_file-to-save-the-results-to-disk-so-you-can-load-it-later-42"><span class="toc-item-num">4.2&nbsp;&nbsp;</span>Pass in cookies so you can also get the number of results. Pass in sqlite_file to save the results to disk so you can load it later</a></div><div class="lev2 toc-item"><a href="#If-your-test-gets-interrupted-or-you-add-more-keywords,-you-can-pick-up-where-you-left-off" data-toc-modified-id="If-your-test-gets-interrupted-or-you-add-more-keywords,-you-can-pick-up-where-you-left-off-43"><span class="toc-item-num">4.3&nbsp;&nbsp;</span>If your test gets interrupted or you add more keywords, you can pick up where you left off</a></div><div class="lev2 toc-item"><a href="#You-can-attach-notes-or-categorizations-to-your-keywords-for-easy-querying-and-analysis-later" data-toc-modified-id="You-can-attach-notes-or-categorizations-to-your-keywords-for-easy-querying-and-analysis-later-44"><span class="toc-item-num">4.4&nbsp;&nbsp;</span>You can attach notes or categorizations to your keywords for easy querying and analysis later</a></div><div class="lev2 toc-item"><a href="#If-you-want-to-test-multiple-times-a-day,-just-pass-in-the-test_number-param" data-toc-modified-id="If-you-want-to-test-multiple-times-a-day,-just-pass-in-the-test_number-param-45"><span class="toc-item-num">4.5&nbsp;&nbsp;</span>If you want to test multiple times a day, just pass in the <code>test_number</code> param</a></div><div class="lev2 toc-item"><a href="#It-can-skip-redundant-keywords" data-toc-modified-id="It-can-skip-redundant-keywords-46"><span class="toc-item-num">4.6&nbsp;&nbsp;</span>It can skip redundant keywords</a></div><div class="lev2 toc-item"><a href="#You-can-also-pass-in-lists-if-you-prefer-(though-you-can't-include-the-source-or-notes)" data-toc-modified-id="You-can-also-pass-in-lists-if-you-prefer-(though-you-can't-include-the-source-or-notes)-47"><span class="toc-item-num">4.7&nbsp;&nbsp;</span>You can also pass in lists if you prefer (though you can't include the source or notes)</a></div>
+ <p><div class="lev1 toc-item"><a href="#What-is-blockedonweibo?" data-toc-modified-id="What-is-blockedonweibo?-1"><span class="toc-item-num">1&nbsp;&nbsp;</span>What is blockedonweibo?</a></div><div class="lev1 toc-item"><a href="#Install-the-blockedonweibo-package" data-toc-modified-id="Install-the-blockedonweibo-package-2"><span class="toc-item-num">2&nbsp;&nbsp;</span>Install the blockedonweibo package</a></div><div class="lev1 toc-item"><a href="#Adjust-your-settings" data-toc-modified-id="Adjust-your-settings-3"><span class="toc-item-num">3&nbsp;&nbsp;</span>Adjust your settings</a></div><div class="lev1 toc-item"><a href="#Let's-start-testing!" data-toc-modified-id="Let's-start-testing!-4"><span class="toc-item-num">4&nbsp;&nbsp;</span>Let's start testing!</a></div><div class="lev2 toc-item"><a href="#Pass-a-dictionary-of-keywords-to-start-testing" data-toc-modified-id="Pass-a-dictionary-of-keywords-to-start-testing-41"><span class="toc-item-num">4.1&nbsp;&nbsp;</span>Pass a dictionary of keywords to start testing</a></div><div class="lev2 toc-item"><a href="#Pass-in-cookies-so-you-can-also-get-the-number-of-results.-Pass-in-sqlite_file-to-save-the-results-to-disk-so-you-can-load-it-later" data-toc-modified-id="Pass-in-cookies-so-you-can-also-get-the-number-of-results.-Pass-in-sqlite_file-to-save-the-results-to-disk-so-you-can-load-it-later-42"><span class="toc-item-num">4.2&nbsp;&nbsp;</span>Pass in cookies so you can also get the number of results. Pass in sqlite_file to save the results to disk so you can load it later</a></div><div class="lev2 toc-item"><a href="#If-your-test-gets-interrupted-or-you-add-more-keywords,-you-can-pick-up-where-you-left-off" data-toc-modified-id="If-your-test-gets-interrupted-or-you-add-more-keywords,-you-can-pick-up-where-you-left-off-43"><span class="toc-item-num">4.3&nbsp;&nbsp;</span>If your test gets interrupted or you add more keywords, you can pick up where you left off</a></div><div class="lev2 toc-item"><a href="#You-can-attach-notes-or-categorizations-to-your-keywords-for-easy-querying-and-analysis-later" data-toc-modified-id="You-can-attach-notes-or-categorizations-to-your-keywords-for-easy-querying-and-analysis-later-44"><span class="toc-item-num">4.4&nbsp;&nbsp;</span>You can attach notes or categorizations to your keywords for easy querying and analysis later</a></div><div class="lev2 toc-item"><a href="#If-you-want-to-test-multiple-times-a-day,-just-pass-in-the-test_number-param" data-toc-modified-id="If-you-want-to-test-multiple-times-a-day,-just-pass-in-the-test_number-param-45"><span class="toc-item-num">4.5&nbsp;&nbsp;</span>If you want to test multiple times a day, just pass in the <code>test_number</code> param</a></div><div class="lev2 toc-item"><a href="#It-can-skip-redundant-keywords" data-toc-modified-id="It-can-skip-redundant-keywords-46"><span class="toc-item-num">4.6&nbsp;&nbsp;</span>It can skip redundant keywords</a></div><div class="lev2 toc-item"><a href="#You-can-also-pass-in-lists-if-you-prefer-(though-you-can't-include-the-source-or-notes)" data-toc-modified-id="You-can-also-pass-in-lists-if-you-prefer-(though-you-can't-include-the-source-or-notes)-47"><span class="toc-item-num">4.7&nbsp;&nbsp;</span>You can also pass in lists if you prefer (though you can't include the source or notes)</a></div><div class="lev2 toc-item"><a href="#It-can-detect-the-canonical-(minimum)-set-of-characters-in-the-search-query-triggering-censorship" data-toc-modified-id="It-can-detect-the-canonical-(minimum)-set-of-characters-in-the-search-query-triggering-censorship-48"><span class="toc-item-num">4.8&nbsp;&nbsp;</span>It can detect the canonical (minimum) set of characters in the search query triggering censorship</a></div>
 
 # Install the blockedonweibo package
 
@@ -164,8 +180,10 @@ weibo.run(sample_keywords_df,insert=False,return_df=True)
       <th></th>
       <th>date</th>
       <th>datetime</th>
+      <th>is_canonical</th>
       <th>keyword</th>
       <th>num_results</th>
+      <th>orig_keyword</th>
       <th>result</th>
       <th>source</th>
       <th>test_number</th>
@@ -176,8 +194,10 @@ weibo.run(sample_keywords_df,insert=False,return_df=True)
       <th>0</th>
       <td>2017-09-25</td>
       <td>2017-09-25 10:12:45.280812</td>
+      <td>False</td>
       <td>hello</td>
       <td>[]</td>
+      <td>None</td>
       <td>has_results</td>
       <td>my dataframe</td>
       <td>1</td>
@@ -186,7 +206,9 @@ weibo.run(sample_keywords_df,insert=False,return_df=True)
       <th>0</th>
       <td>2017-09-25</td>
       <td>2017-09-25 10:13:00.191900</td>
+      <td>False</td>
       <td>lxb</td>
+      <td>None</td>
       <td>None</td>
       <td>censored</td>
       <td>my dataframe</td>
@@ -196,7 +218,9 @@ weibo.run(sample_keywords_df,insert=False,return_df=True)
       <th>0</th>
       <td>2017-09-25</td>
       <td>2017-09-25 10:13:16.356805</td>
+      <td>False</td>
       <td>习胞子</td>
+      <td>None</td>
       <td>None</td>
       <td>no_results</td>
       <td>my dataframe</td>
@@ -241,8 +265,10 @@ weibo.sqlite_to_df(sqlite_file)
       <th>censored</th>
       <th>no_results</th>
       <th>reset</th>
+      <th>is_canonical</th>
       <th>result</th>
       <th>source</th>
+      <th>orig_keyword</th>
       <th>num_results</th>
       <th>notes</th>
     </tr>
@@ -258,8 +284,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>80454701.0</td>
       <td>None</td>
     </tr>
@@ -273,8 +301,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -288,8 +318,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>no_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -383,8 +415,10 @@ weibo.sqlite_to_df(sqlite_file)
       <th>censored</th>
       <th>no_results</th>
       <th>reset</th>
+      <th>is_canonical</th>
       <th>result</th>
       <th>source</th>
+      <th>orig_keyword</th>
       <th>num_results</th>
       <th>notes</th>
     </tr>
@@ -400,8 +434,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>80454701.0</td>
       <td>None</td>
     </tr>
@@ -415,8 +451,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -430,8 +468,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>no_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -445,8 +485,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -562,8 +604,10 @@ weibo.sqlite_to_df(sqlite_file)
       <th>censored</th>
       <th>no_results</th>
       <th>reset</th>
+      <th>is_canonical</th>
       <th>result</th>
       <th>source</th>
+      <th>orig_keyword</th>
       <th>num_results</th>
       <th>notes</th>
     </tr>
@@ -579,8 +623,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>80454701.0</td>
       <td>None</td>
     </tr>
@@ -594,8 +640,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -609,8 +657,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>no_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -624,8 +674,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -639,8 +691,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>5705260.0</td>
       <td>pop culture</td>
     </tr>
@@ -654,8 +708,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>881.0</td>
       <td>pop culture</td>
     </tr>
@@ -669,8 +725,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>63401495.0</td>
       <td>social media</td>
     </tr>
@@ -702,8 +760,10 @@ results.query("notes=='pop culture'")
       <th>censored</th>
       <th>no_results</th>
       <th>reset</th>
+      <th>is_canonical</th>
       <th>result</th>
       <th>source</th>
+      <th>orig_keyword</th>
       <th>num_results</th>
       <th>notes</th>
     </tr>
@@ -719,8 +779,10 @@ results.query("notes=='pop culture'")
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>5705260.0</td>
       <td>pop culture</td>
     </tr>
@@ -734,8 +796,10 @@ results.query("notes=='pop culture'")
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>881.0</td>
       <td>pop culture</td>
     </tr>
@@ -787,8 +851,10 @@ weibo.sqlite_to_df(sqlite_file)
       <th>censored</th>
       <th>no_results</th>
       <th>reset</th>
+      <th>is_canonical</th>
       <th>result</th>
       <th>source</th>
+      <th>orig_keyword</th>
       <th>num_results</th>
       <th>notes</th>
     </tr>
@@ -804,8 +870,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>80454701.0</td>
       <td>None</td>
     </tr>
@@ -819,8 +887,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -834,8 +904,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>no_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -849,8 +921,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -864,8 +938,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>5705260.0</td>
       <td>pop culture</td>
     </tr>
@@ -879,8 +955,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>881.0</td>
       <td>pop culture</td>
     </tr>
@@ -894,8 +972,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>63401495.0</td>
       <td>social media</td>
     </tr>
@@ -909,8 +989,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>80454634.0</td>
       <td>None</td>
     </tr>
@@ -924,8 +1006,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -939,8 +1023,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>no_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -954,8 +1040,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1049,8 +1137,10 @@ weibo.sqlite_to_df(sqlite_file)
       <th>censored</th>
       <th>no_results</th>
       <th>reset</th>
+      <th>is_canonical</th>
       <th>result</th>
       <th>source</th>
+      <th>orig_keyword</th>
       <th>num_results</th>
       <th>notes</th>
     </tr>
@@ -1066,8 +1156,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>80454701.0</td>
       <td>None</td>
     </tr>
@@ -1081,8 +1173,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1096,8 +1190,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>no_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1111,8 +1207,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1126,8 +1224,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>5705260.0</td>
       <td>pop culture</td>
     </tr>
@@ -1141,8 +1241,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>881.0</td>
       <td>pop culture</td>
     </tr>
@@ -1156,8 +1258,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>63401495.0</td>
       <td>social media</td>
     </tr>
@@ -1171,8 +1275,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>80454634.0</td>
       <td>None</td>
     </tr>
@@ -1186,8 +1292,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1201,8 +1309,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>no_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1216,8 +1326,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1231,8 +1343,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe2</td>
+      <td>None</td>
       <td>109.0</td>
       <td>location</td>
     </tr>
@@ -1246,15 +1360,16 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe2</td>
+      <td>None</td>
       <td>648313.0</td>
       <td>pop culture</td>
     </tr>
   </tbody>
 </table>
 </div>
-
 
 
 ## You can also pass in lists if you prefer (though you can't include the source or notes)
@@ -1300,8 +1415,10 @@ weibo.sqlite_to_df(sqlite_file)
       <th>censored</th>
       <th>no_results</th>
       <th>reset</th>
+      <th>is_canonical</th>
       <th>result</th>
       <th>source</th>
+      <th>orig_keyword</th>
       <th>num_results</th>
       <th>notes</th>
     </tr>
@@ -1317,8 +1434,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>80454701.0</td>
       <td>None</td>
     </tr>
@@ -1332,8 +1451,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1347,8 +1468,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>no_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1362,8 +1485,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1377,8 +1502,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>5705260.0</td>
       <td>pop culture</td>
     </tr>
@@ -1392,8 +1519,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>881.0</td>
       <td>pop culture</td>
     </tr>
@@ -1407,8 +1536,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>63401495.0</td>
       <td>social media</td>
     </tr>
@@ -1422,8 +1553,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>80454634.0</td>
       <td>None</td>
     </tr>
@@ -1437,8 +1570,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1452,8 +1587,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>no_results</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1467,8 +1604,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>my dataframe</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1482,8 +1621,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe2</td>
+      <td>None</td>
       <td>109.0</td>
       <td>location</td>
     </tr>
@@ -1497,8 +1638,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>my dataframe2</td>
+      <td>None</td>
       <td>648313.0</td>
       <td>pop culture</td>
     </tr>
@@ -1512,8 +1655,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>list</td>
+      <td>None</td>
       <td>648313.0</td>
       <td>None</td>
     </tr>
@@ -1527,8 +1672,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>has_results</td>
       <td>list</td>
+      <td>None</td>
       <td>28413048.0</td>
       <td>None</td>
     </tr>
@@ -1542,8 +1689,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>reset</td>
       <td>list</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1557,8 +1706,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>censored</td>
       <td>list</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1572,8 +1723,10 @@ weibo.sqlite_to_df(sqlite_file)
       <td>0</td>
       <td>0</td>
       <td>0</td>
+      <td>0</td>
       <td>no_results</td>
       <td>list</td>
+      <td>None</td>
       <td>NaN</td>
       <td>None</td>
     </tr>
@@ -1582,8 +1735,421 @@ weibo.sqlite_to_df(sqlite_file)
 </div>
 
 
+## It can detect the canonical (minimum) set of characters in the search query triggering censorship
 
+Set `get_canonical=True` when running to find which part of a censored search query is actually triggering the censorship. Note: this will only work on explicitly censored search queries.
+
+Finding canonical censored keywords can take a large number of search cycles, especially with larger original queries. 
 
 ```python
-
+weibo.run(['江蛤','江泽民江蛤蟆'],sqlite_file=sqlite_file,cookies=cookie,continue_interruptions=False,get_canonical=True)
 ```
+
+If we find a minimum keyword component, we'll record it as a keyword, set column `is_canonical` to True, and record our full search query in `orig_keyword`. For completeness, we'll also include the original keyword as its own entry with `is_canonical=False`
+
+```python
+weibo.sqlite_to_df(sqlite_file)
+```
+
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>id</th>
+      <th>date</th>
+      <th>datetime_logged</th>
+      <th>test_number</th>
+      <th>keyword</th>
+      <th>censored</th>
+      <th>no_results</th>
+      <th>reset</th>
+      <th>is_canonical</th>
+      <th>result</th>
+      <th>source</th>
+      <th>orig_keyword</th>
+      <th>num_results</th>
+      <th>notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>0</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:13:37.816720</td>
+      <td>1</td>
+      <td>hello</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>has_results</td>
+      <td>my dataframe</td>
+      <td>None</td>
+      <td>80454701.0</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>1</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:13:54.356722</td>
+      <td>1</td>
+      <td>lxb</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>censored</td>
+      <td>my dataframe</td>
+      <td>None</td>
+      <td>NaN</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>2</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:14:11.489530</td>
+      <td>1</td>
+      <td>习胞子</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>no_results</td>
+      <td>my dataframe</td>
+      <td>None</td>
+      <td>NaN</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>3</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:14:29.667395</td>
+      <td>1</td>
+      <td>刘晓波</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>censored</td>
+      <td>my dataframe</td>
+      <td>None</td>
+      <td>NaN</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>4</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:14:49.107078</td>
+      <td>1</td>
+      <td>pokemon</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>has_results</td>
+      <td>my dataframe</td>
+      <td>None</td>
+      <td>5705260.0</td>
+      <td>pop culture</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>5</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:15:09.762484</td>
+      <td>1</td>
+      <td>jay chou</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>has_results</td>
+      <td>my dataframe</td>
+      <td>None</td>
+      <td>881.0</td>
+      <td>pop culture</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>6</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:15:28.100418</td>
+      <td>1</td>
+      <td>weibo</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>has_results</td>
+      <td>my dataframe</td>
+      <td>None</td>
+      <td>63401495.0</td>
+      <td>social media</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>7</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:15:46.214464</td>
+      <td>2</td>
+      <td>hello</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>has_results</td>
+      <td>my dataframe</td>
+      <td>None</td>
+      <td>80454634.0</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>8</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:16:03.274804</td>
+      <td>2</td>
+      <td>lxb</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>censored</td>
+      <td>my dataframe</td>
+      <td>None</td>
+      <td>NaN</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>9</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:16:19.035805</td>
+      <td>2</td>
+      <td>习胞子</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>no_results</td>
+      <td>my dataframe</td>
+      <td>None</td>
+      <td>NaN</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>10</th>
+      <td>10</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:16:36.021837</td>
+      <td>2</td>
+      <td>刘晓波</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>censored</td>
+      <td>my dataframe</td>
+      <td>None</td>
+      <td>NaN</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>11</th>
+      <td>11</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:16:53.766351</td>
+      <td>1</td>
+      <td>zhongnanhai</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>has_results</td>
+      <td>my dataframe2</td>
+      <td>None</td>
+      <td>109.0</td>
+      <td>location</td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <td>12</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:17:14.124440</td>
+      <td>1</td>
+      <td>cats</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>has_results</td>
+      <td>my dataframe2</td>
+      <td>None</td>
+      <td>648313.0</td>
+      <td>pop culture</td>
+    </tr>
+    <tr>
+      <th>13</th>
+      <td>13</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:17:36.205255</td>
+      <td>1</td>
+      <td>cats</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>has_results</td>
+      <td>list</td>
+      <td>None</td>
+      <td>648313.0</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>14</th>
+      <td>14</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:17:54.330039</td>
+      <td>1</td>
+      <td>yes</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>has_results</td>
+      <td>list</td>
+      <td>None</td>
+      <td>28413048.0</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>15</th>
+      <td>15</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:19:47.007930</td>
+      <td>1</td>
+      <td>自由亚洲电台</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>reset</td>
+      <td>list</td>
+      <td>None</td>
+      <td>NaN</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>16</th>
+      <td>16</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:20:03.491231</td>
+      <td>1</td>
+      <td>刘晓波</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>censored</td>
+      <td>list</td>
+      <td>None</td>
+      <td>NaN</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>17</th>
+      <td>17</td>
+      <td>2017-09-25</td>
+      <td>2017-09-25 10:20:18.747414</td>
+      <td>1</td>
+      <td>dhfjkdashfjkasdsf87</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>no_results</td>
+      <td>list</td>
+      <td>None</td>
+      <td>NaN</td>
+      <td>None</td>
+    </tr>
+     <tr>
+      <th>18</th>
+      <td>18</td>
+      <td>2017-11-15</td>
+      <td>2017-11-15 12:38:32.931313</td>
+      <td>1</td>
+      <td>江蛤</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>censored</td>
+      <td>list</td>
+      <td>江蛤</td>
+      <td>NaN</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>19</th>
+      <td>19</td>
+      <td>2017-11-15</td>
+      <td>2017-11-15 12:38:32.963135</td>
+      <td>1</td>
+      <td>江蛤</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>censored</td>
+      <td>list</td>
+      <td>None</td>
+      <td>NaN</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>20</th>
+      <td>20</td>
+      <td>2017-11-15</td>
+      <td>2017-11-15 12:40:21.294841</td>
+      <td>1</td>
+      <td>江蛤</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>censored</td>
+      <td>list</td>
+      <td>江泽民江蛤蟆</td>
+      <td>NaN</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <th>21</th>
+      <td>21</td>
+      <td>2017-11-15</td>
+      <td>2017-11-15 12:40:21.326378</td>
+      <td>1</td>
+      <td>江泽民江蛤蟆</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>censored</td>
+      <td>list</td>
+      <td>None</td>
+      <td>NaN</td>
+      <td>None</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+     
