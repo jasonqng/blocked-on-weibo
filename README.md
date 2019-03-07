@@ -27,18 +27,13 @@ this setup guide)
 
 The github repo for this Weibo keyword testing script is located at https://github.com/jasonqng/blocked-on-weibo.
 
-To begin using this python package, inside your terminal, do a
-```
-git clone https://github.com/jasonqng/blocked-on-weibo.git
-```
-or 
+To begin using this python package, inside your terminal, run
 
 ```
-git clone git@github.com:jasonqng/blocked-on-weibo.git
-``` 
-(if you prefer ssh).
+pip install blockedonweibo
+```
 
-Then `cd` into the downloaded directory and install the requirements then the package:
+Alternatively, you can clone this repo, `cd` into the repo directory and manually install the requirements and package:
 
 ```
 pip install -r requirements.txt
