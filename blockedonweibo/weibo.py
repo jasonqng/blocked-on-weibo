@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 from bs4 import BeautifulSoup
 import urllib
 import codecs
@@ -15,7 +12,6 @@ import requests
 import base64  
 import re
 import ast
-from df2gspread import gspread2df as g2d
 import sys
 try:
     from urllib.parse import urlparse
@@ -31,84 +27,12 @@ except ValueError:
     import weibo_credentials
 ### SETTINGS
 
-CENSORSHIP_PHRASE_UTF8 = '根据相关法律法规和政策'
-CAPTCHA_PHRASE_UTF8 = '你的行为有些异常'
-NO_RESULTS_PHRASE_UTF8 = '抱歉，未找到'
-CENSORSHIP_PHRASE_DECODED = codecs.encode(CENSORSHIP_PHRASE_UTF8.decode('utf8'), 'unicode_escape')
-CAPTCHA_PHRASE_DECODED = codecs.encode(CAPTCHA_PHRASE_UTF8.decode('utf8'), 'unicode_escape')
-NO_RESULTS_PHRASE_DECODED = codecs.encode(NO_RESULTS_PHRASE_UTF8.decode('utf8'), 'unicode_escape')
-
-def user_login(username=weibo_credentials.Creds().username,
-                password=weibo_credentials.Creds().password,
-                write_cookie=True):
-    """
-    Logs a user into Weibo and generates a cookie
-    Returns a Requests session with cookie object
-    Pulls username and password from weibo_credentials.py
-    code from https://www.zhihu.com/question/29666539 with minor modifications
-    """
-    session = requests.Session()  
-    url_prelogin = 'http://login.sina.com.cn/sso/prelogin.php?entry=weibo&callback=sinaSSOController.preloginCallBack&su=&rsakt=mod&client=ssologin.js(v1.4.5)&_=1364875106625'  
-    url_login = 'http://login.sina.com.cn/sso/login.php?client=ssologin.js(v1.4.5)'  
-
-    #get servertime,nonce, pubkey,rsakv  
-    resp       = session.get(url_prelogin)  
-    json_data  = re.findall(r'(?<=\().*(?=\))', resp.text)[0]
-    data       = json.loads(json_data)  
-
-
-    servertime = data['servertime']  
-    nonce      = data['nonce']  
-    pubkey     = data['pubkey']  
-    rsakv      = data['rsakv']  
-
-    # calculate su  
-    su  = base64.b64encode(username.encode(encoding="utf-8"))  
-
-    #calculate sp  
-    rsaPublickey= int(pubkey,16)  
-    key = rsa.PublicKey(rsaPublickey,65537)  
-    message = str(servertime) +'\t' + str(nonce) + '\n' + str(password)  
-    sp = binascii.b2a_hex(rsa.encrypt(message.encode(encoding="utf-8"),key))  
-    postdata = {  
-                        'entry': 'weibo',  
-                        'gateway': '1',  
-                        'from': '',  
-                        'savestate': '7',  
-                        'userticket': '1',  
-                        'ssosimplelogin': '1',  
-                        'vsnf': '1',  
-                        'vsnval': '',  
-                        'su': su,  
-                        'service': 'miniblog',  
-                        'servertime': servertime,  
-                        'nonce': nonce,  
-                        'pwencode': 'rsa2',  
-                        'sp': sp,  
-                        'encoding': 'UTF-8',  
-                        'url': 'http://weibo.com/ajaxlogin.php?framelogin=1&callback=parent.sinaSSOController.feedBackUrlCallBack',  
-                        'returntype': 'META',  
-                        'rsakv' : rsakv,  
-                        }
-    resp = session.post(url_login,data=postdata)
-    # print resp.headers
-    #print(resp.content)
-    login_url = re.findall(r'http://weibo.*&retcode=0',resp.text)
-    #print(login_url)
-    try:
-        respo = session.get(login_url[0])
-    except IndexError:
-        raise AttributeError("Couldn't login. Check that your credentials are valid.")
-    uid = re.findall('"uniqueid":"(\d+)",',respo.text)[0]
-    url = "http://weibo.com/u/"+uid
-    respo = session.get(url)
-    if write_cookie:
-        cookie_dict = session.cookies.get_dict()
-        json.dump(cookie_dict, open(username + "_cookie.txt",'w'))
-    return session
+CENSORSHIP_PHRASE = u'根据相关法律法规和政策'
+CAPTCHA_PHRASE = u'你的行为有些异常'
+NO_RESULTS_PHRASE = u'抱歉，未找到'
 
 def has_censorship(keyword_encoded,
-                cookies=None):
+                cookie=None):
 
     """
     Function which actually looks up whether a search for the given keyword returns text
@@ -118,13 +42,14 @@ def has_censorship(keyword_encoded,
     Returns string of 'censored','no_results','reset',or 'has_results'
     ('has_results' is actually not a garuantee; it's merely a lack of other censorship indicators)
     """
-    url = ('http://s.weibo.com/weibo/%s&Refer=index' % keyword_encoded).encode('utf-8')    
-    
+    url = (f'https://s.weibo.com/weibo?q={keyword_encoded}')
+    cookies = {'required_cookie': cookie}
+    headers = {'User-Agent': 'Mozilla/5.0'}
     try:
-        r = requests.get(url,cookies=cookies).text
+        r = requests.get(url,cookies=cookies, headers=headers).text
         i = 1
         while True:
-            if CAPTCHA_PHRASE_DECODED not in r:
+            if CAPTCHA_PHRASE not in r:
                 break
             else:
                 print("CAPTCHA", keyword_encoded, "sleeping for %s seconds" % 300*i)
@@ -144,10 +69,9 @@ def has_censorship(keyword_encoded,
         num_results = int(num_results[0])
     else:
         None
-    
-    if CENSORSHIP_PHRASE_DECODED in r:
+    if CENSORSHIP_PHRASE in r:
         return ("censored",None)
-    elif NO_RESULTS_PHRASE_DECODED in r:
+    elif NO_RESULTS_PHRASE in r:
         return ("no_results",None)
     else:
         return ("has_results",num_results)
@@ -195,17 +119,17 @@ def insert_into_database(record_id,
     if isinstance(num_results, list):
         num_results = None
     
-    if result is "censored":
+    if result == "censored":
         censored = True
     else:
         censored = False
         
-    if result is "no_results":
+    if result == "no_results":
         no_results = True
     else:
         no_results = False
         
-    if result is "reset":
+    if result == "reset":
         reset = True
     else:
         reset = False
@@ -221,27 +145,6 @@ def insert_into_database(record_id,
 
     conn.commit()
     conn.close()
-
-def get_keywords_from_source(location,
-                keyword_col_name,
-                source_name):
-    """
-    Generating the keyword lists to search on
-    """
-    test_keywords = pd.DataFrame()
-    if '.csv' in location:
-        s=requests.get(location).content
-        test_df=pd.read_csv(io.StringIO(s.decode('utf-8')))
-    elif "recommendation" in location:
-        pass
-    else:
-        test_df = g2d.download(location,wks_name='Sheet2',col_names=True)
-    if '.csv' in location:
-        test_keywords['category'] = test_df.category
-    test_keywords['keyword'] = test_df[keyword_col_name]
-    test_keywords['source'] = source_name
-    test_keywords['notes'] = None
-    return test_keywords
     
 def sqlite_to_df(sqlite_file,
                 query="select * from results where source!='_meta_' or source is NULL;"):
@@ -250,24 +153,25 @@ def sqlite_to_df(sqlite_file,
     return df
 
 def verify_cookies_work(cookie,
-                return_full_response=False):
+                return_full_response_text=False):
     """
     Returns True if cookies return profile indicator
     If no cookie or bad cookie is passed, you get a generic login page which doesn't have the indicator
     """
-    if return_full_response:
-        r = requests.get('http://s.weibo.com/weibo/%25E9%25AB%2598%25E8%2587%25AA%25E8%2581%2594&Refer=index',cookies=cookie).content
+    cookies = {'required_cookie': cookie}
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    r = requests.get('https://s.weibo.com/weibo?q=test',cookies=cookies, headers=headers).text
+    if return_full_response_text:
         return r
-    r = requests.get('http://level.account.weibo.com/level/mylevel?from=profile1',cookies=cookie).text
-    if "W_face_radius" in r:
+    if "onick" in r:
         return True
     else:
         return False
 
-def load_cookies(cookie_file=weibo_credentials.Creds().username + "_cookie.txt"):
+def load_cookies(cookie_file="_cookie.txt"):
     with open(cookie_file, 'r') as f:
         #cookie = ast.literal_eval(f.read())
-        cookie = json.load(f)
+        cookie = f.read()
     return cookie
 
 def run(keywords,
@@ -276,7 +180,7 @@ def run(keywords,
                 sqlite_file=None,
                 return_df=False,
                 sleep=True,
-                cookies=None,
+                cookie=None,
                 sleep_secs=15,
                 continue_interruptions=True,
                 date=datetime.now().strftime('%Y-%m-%d'),
@@ -314,8 +218,6 @@ def run(keywords,
 
     for r in test_keywords.itertuples():
         if isinstance(r.keyword, str):
-            keyword_encoded = r.keyword.decode('utf-8')
-        else:
             keyword_encoded = r.keyword
 
         if sqlite_file:
@@ -323,7 +225,7 @@ def run(keywords,
                 continue
             if len(sqlite_to_df(sqlite_file).query(u"date=='%s' & source=='%s' & test_number==%s & keyword=='%s' & is_canonical!=1" % (date,source,test_number,keyword_encoded)))>0 and continue_interruptions:
                 continue
-        result,num_results = has_censorship(keyword_encoded,cookies)
+        result,num_results = has_censorship(keyword_encoded,cookie)
         if verbose=="all":
             print(r.Index,keyword_encoded, result)
         elif verbose=="some" and (count%10==0 or count==0):
@@ -333,8 +235,8 @@ def run(keywords,
         if get_canonical and result == "censored":
             if verbose=="some" or verbose=="all":
                 print("Found censored search phrase; determining canonical censored keyword set")
-            sleep_recursive = sleep_secs if sleep is True else 0
-            potential_kws = split_search_query(keyword_encoded, cookies, sleep_recursive, res_rtn=[], known_blocked=True, verbose=verbose)
+            sleep_recursive = sleep_secs if sleep else 0
+            potential_kws = split_search_query(keyword_encoded, cookie, sleep_recursive, res_rtn=[], known_blocked=True, verbose=verbose)
             if verbose=="all":
                 print(potential_kws)
 
@@ -348,9 +250,9 @@ def run(keywords,
                         print("Testing %d of %d: omitting character %s" %(i+1, len(test_list), kw[i]))
                     if sleep:
                         time.sleep(random.randint(math.ceil(sleep_secs * .90), math.ceil(sleep_secs * 1.10)))
-                    if has_censorship(test_list[i], cookies)[0] != "censored":
+                    if has_censorship(test_list[i], cookie)[0] != "censored":
                         min_str += (kw[i])
-                result_min_str, num_results_min_str = has_censorship(min_str, cookies)
+                result_min_str, num_results_min_str = has_censorship(min_str, cookie)
                 if result_min_str == "censored":  # minStr found properly
                     if verbose=="all" or verbose=="some":
                         print("the minimum phrase from '%s' is: '%s'" % (kw, min_str))
@@ -388,7 +290,7 @@ def run(keywords,
         return results_df
 
 
-def split_search_query(query, cookies, sleep_secs=0, res_rtn=[], known_blocked=False, verbose=""):
+def split_search_query(query, cookie, sleep_secs=0, res_rtn=[], known_blocked=False, verbose=""):
     """
     Recursively halves a query and returns portions with blocked keywords as a list of strings.
     :param res_rtn: internal list holding found min keywords during recursive search, DO NOT SPECIFY.
@@ -401,14 +303,14 @@ def split_search_query(query, cookies, sleep_secs=0, res_rtn=[], known_blocked=F
         time.sleep(random.randint(math.ceil(sleep_secs * .90), math.ceil(sleep_secs * 1.10)))
     if (not known_blocked) and verbose=='all':
         print('Recursively shortening... testing query: "%s"' %(query))
-    if (not known_blocked) and has_censorship(query, cookies)[0] != "censored":  # known_blocked=True skips 1st check
+    if (not known_blocked) and has_censorship(query, cookie)[0] != "censored":  # known_blocked=True skips 1st check
         return [-1]
     else:
         mid = len(query) // 2
         left_half = query[:mid]
         right_half = query[mid:]
-        left_res = split_search_query(left_half, cookies, sleep_secs, res_rtn, False, verbose)
-        right_res = split_search_query(right_half, cookies, sleep_secs, res_rtn, False, verbose)
+        left_res = split_search_query(left_half, cookie, sleep_secs, res_rtn, False, verbose)
+        right_res = split_search_query(right_half, cookie, sleep_secs, res_rtn, False, verbose)
         if (left_res[0] == -1) and (right_res[0] == -1):
             res_rtn.append(query)
     return res_rtn
